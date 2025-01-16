@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV Merger Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        /* General Styles */
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f4f7fc;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background: #ffffff;
+            padding: 40px 50px;
+            border-radius: 10px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        h1 {
+            color: #4A4A4A;
+            font-size: 32px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .description p {
+            color: #5A5A5A;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+
+        /* Drag and Drop Area */
+        #drag-drop-area {
+            width: 100%;
+            height: 180px;
+            border: 2px dashed #6C63FF;
+            background-color: #EDEFF2;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #6C63FF;
+            font-size: 18px;
+            margin-bottom: 20px;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        #drag-drop-area:hover {
+            background-color: #f0f4ff;
+            border-color: #5f50db;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            background-color: #6C63FF;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-top: 20px;
+        }
+
+        button:hover {
+            background-color: #5f50db;
+        }
+
+        /* File List */
+        .file-list {
+            text-align: left;
+            margin-top: 20px;
+            max-height: 150px;
+            overflow-y: auto;
+            font-size: 14px;
+            color: #5A5A5A;
+        }
+
+        /* Output Area */
+        #output {
+            margin-top: 20px;
+            font-size: 16px;
+            color: #333;
+            font-weight: bold;
+        }
+
+        #downloadBtn {
+            margin-top: 20px;
+            display: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        #downloadBtn:hover {
+            background-color: #45a049;
+        }
+
+        /* Checkbox Style */
+        label {
+            color: #333;
+            font-size: 14px;
+            margin-top: 10px;
+            display: inline-block;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CSV Merger Tool</h1>
+        <div class="description">
+            <p><strong>Problem: </strong>Are you tired of manually merging CSV files with similar data? This tool automates the process of merging multiple CSV files into a single file, ensuring consistency and saving you time.</p>
+            <p><strong>Solution: </strong>Our CSV Merger Tool allows you to easily upload and merge multiple CSV files, with an option to discard redundant headers. You can download the combined file in just a few clicks!</p>
+        </div>
+
+        <!-- Drag and Drop Area -->
+        <div id="drag-drop-area" onclick="triggerFileInput()">
+            Drag and drop CSV files here or click to select
+        </div>
+        <input type="file" id="fileInput" accept=".csv" multiple onchange="handleFileSelect(event)" />
+        
+        <!-- Option to discard headers -->
+        <label>
+            <input type="checkbox" id="discardHeaders"> Discard headers (except for the first file)
+        </label>
+
+        <button onclick="mergeCSV()">Merge CSV Files</button>
+
+        <!-- Output area for merged data -->
+        <div id="output"></div>
+
+        <!-- File List Preview -->
+        <div class="file-list" id="fileList"></div>
+
+        <!-- Download Button -->
+        <button id="downloadBtn" onclick="downloadCSV()">Download Merged Data</button>
+    </div>
+
+    <script>
+        let mergedData = [];
+        let uploadedFiles = [];
+
+        // Trigger file input on click
+        function triggerFileInput() {
+            document.getElementById('fileInput').click();
+        }
+
+        // Handle file selection
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            handleFiles(files);
+        }
+
+        // Handle drag and drop files
+        function handleDrop(event) {
+            event.preventDefault();
+            const files = event.dataTransfer.files;
+            handleFiles(files);
+        }
+
+        // Handle the files
+        function handleFiles(files) {
+            uploadedFiles = [...uploadedFiles, ...files];
+            updateFileList();
+            for (let file of files) {
+                if (file.name.endsWith('.csv')) {
+                    parseCSV(file);
+                } else {
+                    alert('Please upload CSV files only.');
+                }
+            }
+        }
+
+        // Parse each CSV file
+        function parseCSV(file) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                Papa.parse(event.target.result, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: function(results) {
+                        mergedData.push(results.data);
+                        document.getElementById('output').innerHTML = `Loaded ${file.name} with ${results.data.length} rows.`;
+                    }
+                });
+            };
+            reader.readAsText(file);
+        }
+
+        // Merge CSV files
+        function mergeCSV() {
+            const discardHeaders = document.getElementById('discardHeaders').checked;
+            let finalData = [];
+
+            mergedData.forEach((fileData, index) => {
+                if (discardHeaders && index > 0) {
+                    fileData.forEach(row => {
+                        delete row[Object.keys(row)[0]];  // Remove first column in each row
+                    });
+                }
+
+                finalData = finalData.concat(fileData);  // Merge the data
+            });
+
+            // Update output
+            document.getElementById('output').innerHTML = `${finalData.length} rows merged.`;
+            document.getElementById('downloadBtn').style.display = 'inline-block';
+        }
+
+        // Download CSV
+        function downloadCSV() {
+            const csv = Papa.unparse(mergedData.flat(), { header: true });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            saveAs(blob, 'merged_data.csv');
+        }
+
+        // Update file list display
+        function updateFileList() {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = uploadedFiles.map(file => `<p>${file.name}</p>`).join('');
+        }
+    </script>
+</body>
+</html>
